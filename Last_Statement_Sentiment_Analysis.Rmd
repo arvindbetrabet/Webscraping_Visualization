@@ -1,0 +1,324 @@
+---
+title: "Last Statement Sentiment Analysis"
+output: html_notebook
+---
+
+<br></br>
+<br></br>
+The previous <a href="http://analyticsyatra.com/posts/post_04072017.html">post</a> on Web Scraping, took data from the Texas Department of Criminal Justice website. It also has transcribed last statements made by convicts (who chose to do so). I wanted to know what sort of sentiments those statements conveyed.
+
+```{r}
+# Load the necessary libraries
+suppressMessages(library(rvest))
+suppressMessages(library(xml2))
+# 
+suppressMessages(library(data.table))
+suppressMessages(library(magrittr))
+
+suppressMessages(library(stringr))
+suppressMessages(library(wordcloud2))
+suppressMessages(library(tm))
+suppressMessages(library(dplyr))
+
+suppressMessages(library(tidytext))
+suppressMessages(library(tidyr))
+suppressMessages(library(ggplot2))
+```
+
+```{r}
+URL <- "http://www.tdcj.state.tx.us/death_row/dr_executed_offenders.html"
+
+# parse the html page reference by the URL
+parsePage <- read_html(URL)
+
+# get the "href" attributes from all the <a> tag
+# nodes in the parsed html page
+myHTMLAttributes <- data.table(html_attr(html_nodes(parsePage, "a"), "href"))
+```
+<br></br>
+The page referenced by the URL above, has links to the death row inmate's, offender information (as a scanned .jpg file or as a link to another html page) and to their last statement (as a link to another html page). Some inmates chose not to give a last statement (as a link to another html page that has no_last_statement as its file name).
+
+References to the offender information as well as No Last Statement have to be ignored, leaving just the references to the last statements.
+
+```{r}
+# Select just those URL links that have the text last in them
+# using a wild card last*
+# from the column that has "href" attributes from the <a> tag
+myLastStatement <- myHTMLAttributes[V1 %like% "last*"]
+
+# remove all those URL links that have the text
+# no_last, las.html and jpg
+# Thus leaving just those links that have a Last Statement
+myLastStatement <- myLastStatement[!(V1 %like% "no_last") & !(V1 %like% "las.html") & !(V1 %like% ".jpg")]
+
+#get the number of rows of the dataframe
+rowCount <- nrow(myLastStatement)
+
+# Initialize a character variable
+# to append the text from the last Last Statement
+# web page
+myLSText <- ""
+
+# Initialize a vector for the Last Statement
+# web page address
+myLSURL <- vector(mode = "character", length = rowCount)
+
+
+# The main web page URL for the Texas Department of
+# Criminal Justice, Death Row information
+myMainURL <- "http://www.tdcj.state.tx.us/death_row/"
+
+
+# Loop over each row in the data frame containing
+# the Last Statement page links, append the link with the
+# Main URL to get the complete URL for the Inmate Last
+# Statement
+
+for(i in 1:rowCount){
+  
+  myLSURL[i] <- paste0(myMainURL, myLastStatement$V1[i])
+  
+  # Unfortunately the web page with the Last Statement
+  # does not have CSS id or class that identifies the
+  # text of the Last Statement. There are <p> tags, with text
+  # that is not relevant
+  
+  # So I have to read the page, find all the <p> tag nodes
+  # read the text in the last paragraphs and then process the text
+  # later
+  #sometext <- read_html(myLSURL[i]) 
+  
+  myPNodes <- read_html(myLSURL[i]) %>% 
+    html_nodes("p")
+  
+  length(myPNodes)
+  
+  for (j in 7:length(myPNodes)){
+    myLSText <- paste(myLSText, myPNodes[j])
+  }
+  
+}
+
+
+```
+<br></br>
+Now that I have the text of Last Statements, I have to remove some HTML tags and sub-titles.
+```{r}
+
+# Remove <p>, </p> and <br> tags
+myCleanString <- gsub("(<p>|</p>|<br>)", " ", myLSText)
+
+myCleanString2 <- gsub("<p class=\"text_bold\">Last Statement:", " ", myCleanString)
+
+myCleanString2 <- gsub("\\(Written statement\\)", " ", myCleanString2)
+
+myCleanString2 <- gsub("\\(Spoken statement\\)", " ", myCleanString2)
+
+```
+<br></br>
+Write the text of the Last Statements to a file, for later use.
+
+```{r}
+fileConn<-file("data/output.txt")
+writeLines(myCleanString2, fileConn)
+close(fileConn)
+
+```
+<br></br>
+
+### WordCloud
+<br></br>
+I want to build a word cloud to find out the top words (in terms of frequency) that were spoken by the dath-row inmates.
+
+Word cloud or Tag cloud is used to visualize textual data[^1], typically keyword metadata (also known as tags). The importance of a tag or word is shown either in size of the font (larger the font size means the word has been used more frequently). I am going to use the <a href="https://cran.r-project.org/web/packages/wordcloud2/index.html"><b>wordcloud2</b></a> package, before that there is some textual cleaning involved using the <a href="https://cran.r-project.org/web/packages/tm/index.html"><b>tm</b></a> package.
+
+The next steps involve converting the character object to a Corpus, then tranforming the Corpus by removing white spaces (blank space between words), stemming[^2], stopword removal (common words that provide no value)[^3], etc.
+
+
+
+```{r}
+
+text_df <- data_frame(line = 1, text = myCleanString2)
+
+myTextCorpus <- Corpus(VectorSource(text_df$text))
+
+# convert text to lower case
+myTextCorpus <- tm_map(myTextCorpus, tolower)
+
+# remove white spaces
+myTextCorpus <- tm_map(myTextCorpus, stripWhitespace)
+
+# remove punctuation
+myTextCorpus <- tm_map(myTextCorpus, removePunctuation)
+
+# remove numbers
+myTextCorpus <- tm_map(myTextCorpus, removeNumbers)
+
+# remove stop words
+# keep "y" by removing it from stopwords
+# myStopwords <- c(stopwords('english'), "available", "via")
+# idx <- which(myStopwords == "y")
+# myStopwords <- myStopwords[-idx]
+myTextCorpus <- tm_map(myTextCorpus, removeWords, stopwords('english'))
+
+# stemming
+myTextCorpus <- tm_map(myTextCorpus, stemDocument)
+
+```
+<br >
+A common approach in text mining is to create a term-to-document matrix from the Corpus. The <i><b>tm</b></i> package provided two functions:
+<ul>
+<li>TermDocumentMatrix (terms as rows and documents that have those terms as columns)</li>
+<li>DocumentTermMatrix (Documents as rows and the terms that appear in those documents as columns)</li>
+</ul>
+<br >
+To build the wordcloud, the TermDocumentMatrix is required, since I have collected all last statments as a single document, inspecting it provides the frequency of the words used by the death-row inmates. Since, I want to use <b>wordcloud2</b> a javascript based package, it is expecting the data as a data.frame with the words and the related frequencies in each column.
+
+```{r fig.align='right'}
+myTdm <- TermDocumentMatrix(myTextCorpus, control = list(minWordLength = 1))
+
+#inspect(myTdm)
+
+# Create a data.frame of the words and the related frequencies
+tdmAsMatrix <- as.matrix(myTdm)
+# calculate the frequency of words
+wordFrequencies <- sort(rowSums(m), decreasing=TRUE)
+
+
+
+wordsInDocument <- names(wordFrequencies)
+
+wordFrequencyDF <- data.frame(word=wordsInDocument, freq=wordFrequencies)
+
+# Looking at words that have a frequency greater than or equal
+# to 200
+topWordCount <- subset(wordFrequencyDF, wordFrequencyDF$freq >= 200)
+
+
+wordcloud2(topWordCount)
+
+
+
+```
+
+<br >
+
+From the wordcloud, above we can gauge that the inmates were thinking of Love, Family, Forgiveness and felt a sense of remorse (please hover around the words to get the frequency of the particular word used). In the next section I will look at the sentiments conveyed in the statements.
+<br >
+
+### Sentiment Analysis
+<br >
+I am going to use <a href="http://tidytextmining.com/index.html">Text Mining with R</a>[^4] as the reference for my Sentiment Analysis of the compiled text containing the Texas Death-Row inmate's last statements.
+<br ><br >
+The <a href="">tidytext</a> package uses 3 sentiment lexicons:
+<ul>
+<li><a href="http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010">AFINN</a>: A list of English words rated for valence with an integer between minus five (negative) and plus five (positive). The words have been manually labeled by Finn Årup Nielsen in 2009-2011</li><br >
+<li><a href="https://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html">bing</a>: Based on work in the area of sentiment analysis and opinion mining from social media, e.g., reviews, forum discussions, and blogs</li><br >
+<li><a href="">nrc</a>: A list of English words and their associations with eight basic emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). The annotations were manually done through crowdsourcing. </li>
+</ul>
+
+
+
+
+```{r}
+# Using the cleaned-up text of the last statement from before
+# convert it to a data.frame, and then tokenize the words
+
+myWordSeries <- data_frame(line = 1, text = myCleanString2) %>% unnest_tokens(word, text)
+
+# This series of words will be used to evalute the sentiments
+# by exercising the 3 lexicon packages
+
+```
+<br >
+<br >
+
+####<i>Using - AFINN</i>
+<br >
+```{r}
+afinn_word_counts <- myWordSeries %>%
+  inner_join(get_sentiments("afinn")) %>%
+  count(word, score, sort = TRUE) %>%
+  ungroup()
+
+
+afinn_word_counts %>%
+  group_by(score) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = score)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~score, scales = "free_y") +
+  labs(y = "Last Statement Words, and their contribution to sentiment",
+       x = NULL) +
+  coord_flip() + ggtitle("Sentiment Analysis - AFINN") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+<br >
+The <b>AFINN</b> lexicon, indicates that the death-row inmate's last statements contained words that had more positive sentiments than negative. Infact, the most negative sentiment(a -5 on the AFINN scale) had a single word.
+<br >
+<br >
+
+####<i>Using - nrc</i>
+<br >
+```{r}
+nrc_word_counts <- myWordSeries %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+
+nrc_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Last Statement Words, and their contribution to sentiment",
+       x = NULL) +
+  coord_flip() + ggtitle("Sentiment Analysis - nrc") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+<br >
+The <b>nrc</b> lexicon, also concurs with AFINN, showing that last statements were more positive than negative. Moreover, God is positive and associated with the emotion of Joy & Fear, but Lord is both positive & negative and identified with the emotions of Disgust & Trust - quite a contradiction. Some thought would have to be given to the inmate's background while analysing the sentiments more throughly.
+<br >
+<br >
+
+####<i>Using - bing</i>
+<br >
+```{r}
+bing_word_counts <- myWordSeries %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Last Statement Words, and their contribution to sentiment",
+       x = NULL) +
+  coord_flip() + ggtitle("Sentiment Analysis - bing") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+<br >
+Just two sentiments in the <b>bing</b> lexicon, but agin confirm, that last statements were more positive than negative. Overall, Love, Thank and Peace appear in the positive sentiment, while Death, Pain and Hate are correctly grouped as negative.
+<br >
+<br >
+
+
+
+###<i>Reference</i>
+
+[^1]: https://en.wikipedia.org/wiki/Tag_cloud
+[^2]: https://nlp.stanford.edu/IR-book/html/htmledition/stemming-and-lemmatization-1.html
+[^3]: https://nlp.stanford.edu/IR-book/html/htmledition/dropping-common-terms-stop-words-1.html
+[^4]: Silge, Julia and Robinson, David, "Text Mining with R: A Tidy Approach", May 7, 2017
