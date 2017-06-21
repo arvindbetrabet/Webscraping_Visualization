@@ -172,7 +172,7 @@ A common approach in text mining is to create a term-to-document matrix from the
 <li>DocumentTermMatrix (Documents as rows and the terms that appear in those documents as columns)</li>
 </ul>
 <br >
-To build the wordcloud, the TermDocumentMatrix is required, since I have collected all last statments as a single document, inspecting it provides the frequency of the words used by the death-row inmates. Since, I want to use <b>wordcloud2</b> a javascript based package, it is expecting the data as a data.frame with the words and the related frequencies in each column.
+To build the wordcloud, the TermDocumentMatrix is required, since I have collected all last statements as a single document, inspecting it provides the frequency of the words used by the death-row inmates. Since, I want to use <b>wordcloud2</b> a javascript based package, it is expecting the data as a data.frame with the words and the related frequencies in each column.
 
 ```{r fig.align='right'}
 myTdm <- TermDocumentMatrix(myTextCorpus, control = list(minWordLength = 1))
@@ -214,7 +214,7 @@ The <a href="">tidytext</a> package uses 3 sentiment lexicons:
 <ul>
 <li><a href="http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010">AFINN</a>: A list of English words rated for valence with an integer between minus five (negative) and plus five (positive). The words have been manually labeled by Finn Årup Nielsen in 2009-2011</li><br >
 <li><a href="https://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html">bing</a>: Based on work in the area of sentiment analysis and opinion mining from social media, e.g., reviews, forum discussions, and blogs</li><br >
-<li><a href="">nrc</a>: A list of English words and their associations with eight basic emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). The annotations were manually done through crowdsourcing. </li>
+<li><a href="">nrc</a>: A list of English words and their associations with eight basic emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). The annotations were manually done through crowd-sourcing. </li>
 </ul>
 
 
@@ -256,7 +256,7 @@ afinn_word_counts %>%
 
 ```
 <br >
-The <b>AFINN</b> lexicon, indicates that the death-row inmate's last statements contained words that had more positive sentiments than negative. Infact, the most negative sentiment(a -5 on the AFINN scale) had a single word.
+The <b>AFINN</b> lexicon, indicates that the death-row inmate's last statements contained words that had more positive sentiments than negative. In-fact, the most negative sentiment(a -5 on the AFINN scale) had a single word.
 <br >
 <br >
 
@@ -283,7 +283,7 @@ nrc_word_counts %>%
 
 ```
 <br >
-The <b>nrc</b> lexicon, also concurs with AFINN, showing that last statements were more positive than negative. Moreover, God is positive and associated with the emotion of Joy & Fear, but Lord is both positive & negative and identified with the emotions of Disgust & Trust - quite a contradiction. Some thought would have to be given to the inmate's background while analysing the sentiments more throughly.
+The <b>nrc</b> lexicon, also concurs with AFINN, showing that last statements were more positive than negative. Moreover, God is positive and associated with the emotion of Joy & Fear, but Lord is both positive & negative and identified with the emotions of Disgust & Trust - quite a contradiction. Some thought would have to be given to the inmate's background while analyzing the sentiments more thoroughly.
 <br >
 <br >
 
@@ -310,11 +310,14 @@ bing_word_counts %>%
 
 ```
 <br >
-Just two sentiments in the <b>bing</b> lexicon, but agin confirm, that last statements were more positive than negative. Overall, Love, Thank and Peace appear in the positive sentiment, while Death, Pain and Hate are correctly grouped as negative.
+Just two sentiments in the <b>bing</b> lexicon, but again confirm, that last statements were more positive than negative. Overall, Love, Thank and Peace appear in the positive sentiment, while Death, Pain and Hate are correctly grouped as negative.
 <br >
 <br >
 
-
+###Conclusion
+From the Wordcloud and Sentiment Analysis, those Death-row inmates who chose to give a last statement, before the execution, had a more positive perspective, expressed their Love for their Family, Thanked them and asked for Forgiveness. They also mentioned God, indicating their spiritual fervor, also felt Sorry for what they had done and Apologized.
+<br >
+<br >
 
 ###<i>Reference</i>
 
