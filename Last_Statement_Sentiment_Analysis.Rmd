@@ -252,7 +252,8 @@ afinn_word_counts %>%
   facet_wrap(~score, scales = "free_y") +
   labs(y = "Last Statement Words, and their contribution to sentiment",
        x = NULL) +
-  coord_flip() + ggtitle("Sentiment Analysis - AFINN") + theme(plot.title = element_text(hjust = 0.5))
+  coord_flip() + ggtitle("Sentiment Analysis - AFINN") + theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_gradient(low="red", high="blue")
 
 ```
 <br >
@@ -306,7 +307,8 @@ bing_word_counts %>%
   facet_wrap(~sentiment, scales = "free_y") +
   labs(y = "Last Statement Words, and their contribution to sentiment",
        x = NULL) +
-  coord_flip() + ggtitle("Sentiment Analysis - bing") + theme(plot.title = element_text(hjust = 0.5))
+  coord_flip() + ggtitle("Sentiment Analysis - bing") + theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_fill_brewer(palette="Set1")
 
 ```
 <br >
